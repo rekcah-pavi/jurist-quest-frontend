@@ -1,7 +1,8 @@
 import { Card, CardContent } from "@/components/ui/card"
-import { Users, School, Trophy } from "lucide-react"
+import { Users, School, Trophy, AlertTriangle } from "lucide-react"
 import { useEffect, useState } from "react"
 import useJuryOverview from "@/hooks/useJuryOverview";
+import useJuryOwnRounds from "@/hooks/useJuryOwnRounds";
 import JuryOverviewSkeleton from "@/components/skeleton/JuriDashboard/JuryOverviewSkeleton"
 import {
   ResponsiveContainer,
@@ -15,7 +16,11 @@ import {
 
 const Overview = () => {
   const { overview, isLoading, error } = useJuryOverview();
+  const { rounds, isLoading: roundsLoading } = useJuryOwnRounds();
   const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 })
+
+  // Filter rounds with "evaluating" status
+  const evaluatingRounds = rounds?.filter(round => round.status === 'evaluating') || [];
 
   const registrationEndDate = new Date("2025-12-13T00:00:00")
 
@@ -146,6 +151,48 @@ const Overview = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Warning for Evaluating Rounds */}
+      {evaluatingRounds.length > 0 && (
+        <Card className="bg-amber-50 border-2 border-amber-500 shadow-lg">
+          <CardContent className="p-4 md:p-6">
+            <div className="flex items-start gap-3">
+              <div className="flex-shrink-0">
+                <AlertTriangle className="h-6 w-6 text-amber-600" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-lg font-bold text-amber-900 mb-2">
+                  Action Required: Submit Marks
+                </h3>
+                <p className="text-sm text-amber-800 mb-3">
+                  The following round{evaluatingRounds.length > 1 ? 's are' : ' is'} awaiting your evaluation. Please submit marks as soon as possible.
+                </p>
+                <div className="space-y-2">
+                  {evaluatingRounds.map((round) => (
+                    <div
+                      key={round.id}
+                      className="bg-white border border-amber-200 rounded-lg p-3 flex items-center justify-between"
+                    >
+                      <div>
+                        <p className="font-semibold text-gray-900">{round.round_name}</p>
+                        <p className="text-sm text-gray-600">
+                          {round.date} at {round.time}
+                        </p>
+                      </div>
+                      <span className="px-3 py-1 bg-amber-100 text-amber-800 text-xs font-semibold rounded-full">
+                        Evaluating
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-xs text-amber-700 mt-3">
+                  💡 Go to the <strong>Rounds</strong> tab to submit your marks.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Chart Section - Moved outside the green card */}
       <Card className="shadow-lg border-0">
