@@ -26,7 +26,7 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table"
-import { Plus, Edit, Trash2, Search, Eye, Calendar, Loader2 } from "lucide-react"
+import { Plus, Edit, Trash2, Search, Eye, Calendar, Loader2, Trophy } from "lucide-react"
 import useAdminRounds, { Round, EligibleTeam } from "@/hooks/useAdminRounds"
 import useAdminJuries from "@/hooks/useAdminJuries"
 import { useToast } from "@/hooks/use-toast"
@@ -44,7 +44,7 @@ const ROUND_TYPE_CHOICES = [
 ]
 
 const RoundManagement = () => {
-    const { rounds, isLoading, createRound, updateRound, deleteRound, getEligibleTeams } = useAdminRounds()
+    const { rounds, isLoading, createRound, updateRound, deleteRound, getEligibleTeams, setWinner, refetch } = useAdminRounds()
     const { juries } = useAdminJuries()
     const { toast } = useToast()
 
@@ -56,6 +56,9 @@ const RoundManagement = () => {
     const [deletingRound, setDeletingRound] = useState<Round | null>(null)
     const [viewingRound, setViewingRound] = useState<Round | null>(null)
     const [isSubmitting, setIsSubmitting] = useState(false)
+    const [isSettingWinner, setIsSettingWinner] = useState(false)
+    const [isWinnerConfirmOpen, setIsWinnerConfirmOpen] = useState(false)
+    const [selectedWinnerId, setSelectedWinnerId] = useState<number | null>(null)
 
     // Form state
     const [selectedJury, setSelectedJury] = useState<number | null>(null)
@@ -219,6 +222,42 @@ const RoundManagement = () => {
                 description: error.response?.data?.detail || "Failed to delete round",
                 variant: "destructive",
             })
+        }
+    }
+
+    const handleSelectWinner = async (winnerId: number) => {
+        if (!viewingRound) return
+
+        // Show confirmation dialog first
+        setSelectedWinnerId(winnerId)
+        setIsWinnerConfirmOpen(true)
+    }
+
+    const confirmSelectWinner = async () => {
+        if (!viewingRound || !selectedWinnerId) return
+
+        setIsSettingWinner(true)
+        try {
+            await setWinner({ roundId: viewingRound.id, winnerId: selectedWinnerId })
+            // Wait for the data to refresh before closing dialogs
+            await refetch()
+            toast({
+                title: "Success",
+                description: "Winner selected successfully",
+            })
+            // Update the viewing round to reflect the change
+            setViewingRound(null)
+            setIsDetailsOpen(false)
+            setIsWinnerConfirmOpen(false)
+            setSelectedWinnerId(null)
+        } catch (error: any) {
+            toast({
+                title: "Error",
+                description: error.response?.data?.error || "Failed to set winner",
+                variant: "destructive",
+            })
+        } finally {
+            setIsSettingWinner(false)
         }
     }
 
@@ -496,7 +535,7 @@ const RoundManagement = () => {
                                 </div>
                             )}
 
-                            {/* Marks Section - Only show if round has a winner and marks exist */}
+                            {/* Marks Section - Show if marks exist (even without winner) */}
                             {viewingRound.marks && (viewingRound.marks.team1 || viewingRound.marks.team2) && (
                                 <div className="border-t pt-4">
                                     <h3 className="font-semibold mb-3">Oral Marks</h3>
@@ -606,6 +645,72 @@ const RoundManagement = () => {
                                                     <p className="text-sm text-gray-700">{viewingRound.marks.team2.overall_comments}</p>
                                                 </div>
                                             )}
+                                        </div>
+                                    )}
+
+                                    {/* Winner Selection - Only show if no winner is set yet */}
+                                    {!viewingRound.winner && viewingRound.status === 'evaluating' && (
+                                        <div className="mt-6 border-t pt-4">
+                                            <h4 className="font-semibold mb-3 text-[#2d4817]">Select Winner</h4>
+                                            <p className="text-sm text-gray-600 mb-4">
+                                                Review the marks above and select the winner for this round.
+                                            </p>
+                                            <div className="grid grid-cols-2 gap-4">
+                                                {viewingRound.team1_details && (
+                                                    <Button
+                                                        onClick={() => handleSelectWinner(viewingRound.team1_details!.id)}
+                                                        disabled={isSettingWinner}
+                                                        className={`h-auto py-4 flex flex-col items-center gap-2 relative ${(viewingRound.marks.team1?.total || 0) > (viewingRound.marks.team2?.total || 0)
+                                                            ? 'bg-green-600 hover:bg-green-700 border-2 border-green-400 shadow-lg'
+                                                            : 'bg-[#2d4817] hover:bg-[#1f3210]'
+                                                            }`}
+                                                    >
+                                                        {(viewingRound.marks.team1?.total || 0) > (viewingRound.marks.team2?.total || 0) && (
+                                                            <span className="absolute -top-2 -right-2 bg-yellow-400 text-yellow-900 text-xs font-bold px-2 py-1 rounded-full">
+                                                                Higher Score
+                                                            </span>
+                                                        )}
+                                                        {isSettingWinner ? (
+                                                            <Loader2 className="h-5 w-5 animate-spin" />
+                                                        ) : (
+                                                            <>
+                                                                <Trophy className="h-5 w-5" />
+                                                                <span className="font-semibold">Select {viewingRound.team1_details.team_id}</span>
+                                                                <span className="text-xs opacity-90">
+                                                                    Total: {viewingRound.marks.team1?.total || 0}
+                                                                </span>
+                                                            </>
+                                                        )}
+                                                    </Button>
+                                                )}
+                                                {viewingRound.team2_details && (
+                                                    <Button
+                                                        onClick={() => handleSelectWinner(viewingRound.team2_details!.id)}
+                                                        disabled={isSettingWinner}
+                                                        className={`h-auto py-4 flex flex-col items-center gap-2 relative ${(viewingRound.marks.team2?.total || 0) > (viewingRound.marks.team1?.total || 0)
+                                                            ? 'bg-green-600 hover:bg-green-700 border-2 border-green-400 shadow-lg'
+                                                            : 'bg-[#2d4817] hover:bg-[#1f3210]'
+                                                            }`}
+                                                    >
+                                                        {(viewingRound.marks.team2?.total || 0) > (viewingRound.marks.team1?.total || 0) && (
+                                                            <span className="absolute -top-2 -right-2 bg-yellow-400 text-yellow-900 text-xs font-bold px-2 py-1 rounded-full">
+                                                                Higher Score
+                                                            </span>
+                                                        )}
+                                                        {isSettingWinner ? (
+                                                            <Loader2 className="h-5 w-5 animate-spin" />
+                                                        ) : (
+                                                            <>
+                                                                <Trophy className="h-5 w-5" />
+                                                                <span className="font-semibold">Select {viewingRound.team2_details.team_id}</span>
+                                                                <span className="text-xs opacity-90">
+                                                                    Total: {viewingRound.marks.team2?.total || 0}
+                                                                </span>
+                                                            </>
+                                                        )}
+                                                    </Button>
+                                                )}
+                                            </div>
                                         </div>
                                     )}
                                 </div>
@@ -961,6 +1066,65 @@ const RoundManagement = () => {
                         </Button>
                         <Button variant="destructive" onClick={handleDelete}>
                             Delete
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Winner Confirmation Dialog */}
+            <Dialog open={isWinnerConfirmOpen} onOpenChange={setIsWinnerConfirmOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Confirm Winner Selection</DialogTitle>
+                        <DialogDescription>
+                            Are you sure you want to select this team as the winner? This action will finalize the round results.
+                        </DialogDescription>
+                    </DialogHeader>
+                    {viewingRound && selectedWinnerId && (
+                        <div className="py-4">
+                            <div className="bg-gray-50 p-4 rounded-lg space-y-2">
+                                <p className="font-semibold text-lg">
+                                    {selectedWinnerId === viewingRound.team1_details?.id
+                                        ? viewingRound.team1_details?.team_id
+                                        : viewingRound.team2_details?.team_id}
+                                </p>
+                                <p className="text-sm text-gray-600">
+                                    Total Marks: {selectedWinnerId === viewingRound.team1_details?.id
+                                        ? viewingRound.marks?.team1?.total
+                                        : viewingRound.marks?.team2?.total}
+                                </p>
+                                <p className="text-sm text-gray-600">
+                                    Institution: {selectedWinnerId === viewingRound.team1_details?.id
+                                        ? viewingRound.team1_details?.institution_name
+                                        : viewingRound.team2_details?.institution_name}
+                                </p>
+                            </div>
+                        </div>
+                    )}
+                    <DialogFooter>
+                        <Button
+                            variant="outline"
+                            onClick={() => {
+                                setIsWinnerConfirmOpen(false)
+                                setSelectedWinnerId(null)
+                            }}
+                            disabled={isSettingWinner}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            onClick={confirmSelectWinner}
+                            className="bg-[#2d4817] hover:bg-[#1f3210]"
+                            disabled={isSettingWinner}
+                        >
+                            {isSettingWinner ? (
+                                <>
+                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                    Confirming...
+                                </>
+                            ) : (
+                                'Confirm Winner'
+                            )}
                         </Button>
                     </DialogFooter>
                 </DialogContent>

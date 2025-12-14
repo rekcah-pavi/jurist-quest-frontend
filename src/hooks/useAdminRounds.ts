@@ -158,6 +158,24 @@ const useAdminRounds = () => {
         return response.data
     }
 
+    const setWinner = useMutation({
+        mutationFn: async ({ roundId, winnerId }: { roundId: number; winnerId: number }) => {
+            const response = await axios.post(
+                `${import.meta.env.VITE_API_URL}/api/admin/rounds/${roundId}/set_winner/`,
+                { winner_id: winnerId },
+                {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
+                }
+            )
+            return response.data
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['adminRounds'] })
+        },
+    })
+
     return {
         rounds,
         isLoading,
@@ -165,6 +183,7 @@ const useAdminRounds = () => {
         createRound: createRound.mutateAsync,
         updateRound: updateRound.mutateAsync,
         deleteRound: deleteRound.mutateAsync,
+        setWinner: setWinner.mutateAsync,
         getEligibleTeams,
         refetch: () => queryClient.invalidateQueries({ queryKey: ['adminRounds'] }),
     }

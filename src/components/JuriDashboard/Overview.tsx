@@ -185,9 +185,14 @@ const Overview = () => {
                     </div>
                   ))}
                 </div>
-                <p className="text-xs text-amber-700 mt-3">
-                  💡 Go to the <strong>Rounds</strong> tab to submit your marks.
-                </p>
+                <div className="mt-4 space-y-2">
+                  <p className="text-xs text-amber-700">
+                    💡 Go to the <strong>Rounds</strong> tab to submit your marks.
+                  </p>
+                  <p className="text-xs text-amber-600 italic">
+                    ℹ️ If you have already submitted your marks, please ignore this message. The admin is currently verifying the marks and will select the winner shortly.
+                  </p>
+                </div>
               </div>
             </div>
           </CardContent>
